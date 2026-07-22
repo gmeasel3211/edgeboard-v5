@@ -5,6 +5,7 @@ databases:
     postgresMajorVersion: "17"
     databaseName: edgeboard
     user: edgeboard
+    connectionPool: pgbouncer
 
 services:
   - type: web
@@ -12,18 +13,18 @@ services:
     runtime: docker
     region: ohio
     plan: starter
-    dockerfilePath: ./apps/api/Dockerfile
-    dockerContext: ./apps/api
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
     preDeployCommand: alembic upgrade head
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
         fromDatabase:
           name: edgeboard-postgres
-          property: connectionString
+          property: connectionPoolString
       - key: FRONTEND_URL
         sync: false
       - key: CORS_ORIGINS
@@ -63,14 +64,17 @@ services:
 
   - type: web
     name: edgeboard-web
-    runtime: docker
+    runtime: node
     region: ohio
     plan: starter
-    dockerfilePath: ./apps/web/Dockerfile
-    dockerContext: ./apps/web
+    rootDir: apps/web
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
     healthCheckPath: /
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
     envVars:
+      - key: NODE_VERSION
+        value: 22.15.0
       - key: NEXT_PUBLIC_API_URL
         sync: false
       - key: INTERNAL_API_URL
@@ -84,8 +88,8 @@ services:
     runtime: docker
     region: ohio
     plan: starter
-    dockerfilePath: ./apps/api/Dockerfile
-    dockerContext: ./apps/api
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
     schedule: "*/30 * * * *"
     dockerCommand: python -m app.jobs.refresh
     envVars:
@@ -94,11 +98,11 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: edgeboard-postgres
-          property: connectionString
+          property: connectionPoolString
       - key: ODDS_API_KEY
         sync: false
       - key: MODEL_VERSION
-        value: 4.1.0
+        value: 3.0.0
       - key: DEMO_MODE
         value: "false"
 
@@ -107,8 +111,8 @@ services:
     runtime: docker
     region: ohio
     plan: starter
-    dockerfilePath: ./apps/api/Dockerfile
-    dockerContext: ./apps/api
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
     schedule: "15 */2 * * *"
     dockerCommand: python -m app.jobs.grade
     envVars:
@@ -117,6 +121,6 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: edgeboard-postgres
-          property: connectionString
+          property: connectionPoolString
       - key: DEMO_MODE
         value: "false"
